@@ -54,6 +54,22 @@ $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 $highPerfGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
 $newPlanName = "High Performance (Optimized)"
 
+# Cleanup existing plans with the same name
+$existingPlans = powercfg -list
+foreach ($line in $existingPlans) {
+    if ($line -like "*$newPlanName*") {
+        if ($line -match '([a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12})') {
+            $guidToDelete = $matches[0]
+            if ($line -match '\*\s*$') {
+                # If active, switch to Balanced (standard GUID) to allow deletion
+                powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+            }
+            powercfg -delete $guidToDelete
+            Write-Host "Deleted existing plan: $guidToDelete" -ForegroundColor Yellow
+        }
+    }
+}
+
 Write-Host "Duplicating High Performance scheme..." -ForegroundColor White
 $output = powercfg -duplicatescheme $highPerfGuid 2>&1
 
@@ -82,8 +98,8 @@ powercfg -setacvalueindex $newGuid SUB_PCIEXPRESS ASPM 0
 powercfg -setdcvalueindex $newGuid SUB_PCIEXPRESS ASPM 0
 
 # Set USB Selective Suspend to Disabled (0)
-powercfg -setacvalueindex $newGuid SUB_USB USBSUSPEND 0
-powercfg -setdcvalueindex $newGuid SUB_USB USBSUSPEND 0
+powercfg -setacvalueindex $newGuid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+powercfg -setdcvalueindex $newGuid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
 
 # Set Turn off hard disk after to 0 (Never)
 powercfg -setacvalueindex $newGuid SUB_DISK DISKIDLE 0
