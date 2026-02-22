@@ -6,12 +6,18 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 
 **Use these scripts at your own risk.** These scripts make changes to your system configuration and **do not include a mechanism to reverse actions**. It is highly recommended to create a System Restore Point before proceeding.
 
+## Requirements
+
+*   **Operating System:** Windows 10 or Windows 11
+*   **Permissions:** Administrator privileges (recommended).
+*   **PowerShell:** Version 5.1 or newer.
+
 ## Scripts
 
 | Script | Purpose | Notes |
 | :--- | :--- | :--- |
+| **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Disables Turbo Boost on many CPUs; reduces heat. |
 | **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Auto-elevates. Runs twice to handle dependencies. |
-| **Create-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Disables Turbo Boost on many CPUs; reduces heat. |
 | **Disable-HPET.ps1** | Disables High Precision Event Timer and Dynamic Tick. | Auto-elevates. Reduces latency/stutter. |
 | **Disable-Online-Start-Menu-Search.ps1** | Disables Bing/Online results in Start Menu. | Removes web search results from Start Menu. |
 | **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | May cause temporary lag at login. |
@@ -22,7 +28,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 
 ## How to Run
 
-1. Open **PowerShell**.
+1. Open **PowerShell** (Run as Administrator).
 2. Navigate to the folder containing these scripts:
    ```powershell
    cd "path\to\Windows-Tweaks"

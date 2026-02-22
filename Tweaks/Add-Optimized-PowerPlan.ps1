@@ -37,13 +37,13 @@ Write-Host "4. USB Selective Suspend = Disabled"
 Write-Host "   Prevents USB ports from powering down, ensuring peripherals"
 Write-Host "   remain active and responsive."
 Write-Host ""
-Write-Host "5. Turn off hard disk after = 0 (Never)"
+Write-Host "5. Turn off hard disk after = 0 (Never) on AC, 15 min on Battery"
 Write-Host "   Prevents drives from spinning down or entering deep sleep,"
-Write-Host "   eliminating wake-up latency."
+Write-Host "   eliminating wake-up latency when plugged in."
 Write-Host ""
-Write-Host "6. Sleep after = 0 (Never)"
+Write-Host "6. Sleep after = 0 (Never) on AC, 5 min on Battery"
 Write-Host "   Prevents the system from automatically entering sleep mode,"
-Write-Host "   ensuring continuous operation."
+Write-Host "   ensuring continuous operation when plugged in."
 Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
 
 # Pause for user to read
@@ -101,13 +101,13 @@ powercfg -setdcvalueindex $newGuid SUB_PCIEXPRESS ASPM 0
 powercfg -setacvalueindex $newGuid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
 powercfg -setdcvalueindex $newGuid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
 
-# Set Turn off hard disk after to 0 (Never)
+# Set Turn off hard disk after to 0 (Never) on AC, 15 mins (900s) on DC
 powercfg -setacvalueindex $newGuid SUB_DISK DISKIDLE 0
-powercfg -setdcvalueindex $newGuid SUB_DISK DISKIDLE 0
+powercfg -setdcvalueindex $newGuid SUB_DISK DISKIDLE 900
 
-# Set Sleep after to 0 (Never)
+# Set Sleep after to 0 (Never) on AC, 5 mins (300s) on DC
 powercfg -setacvalueindex $newGuid SUB_SLEEP STANDBYIDLE 0
-powercfg -setdcvalueindex $newGuid SUB_SLEEP STANDBYIDLE 0
+powercfg -setdcvalueindex $newGuid SUB_SLEEP STANDBYIDLE 300
 
 # Activate
 powercfg -setactive $newGuid
