@@ -20,6 +20,9 @@ Write-Host "----------------------------------------------------------------" -F
 Write-Host "This script disables the High Precision Event Timer (HPET) in Windows"
 Write-Host "and disables dynamic ticks to improve system latency."
 Write-Host ""
+Write-Host "NOTE: HPET is normally disabled on Windows 11 and generally not" -ForegroundColor Yellow
+Write-Host "necessary, however Dynamic Tick can cause issues." -ForegroundColor Yellow
+Write-Host ""
 Write-Host "Actions:"
 Write-Host "1. bcdedit /deletevalue useplatformclock"
 Write-Host "2. bcdedit /set disabledynamictick yes"
