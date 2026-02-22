@@ -7,6 +7,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 | Script | Purpose | Key Actions | Notes |
 | :--- | :--- | :--- | :--- |
 | **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Creates Scheduled Task `WingetAutoUpdateUser` to run `winget upgrade --all`. | Auto-elevates. May consume resources at login. |
+| **Disable-HPET.ps1** | Disables High Precision Event Timer. | Runs `bcdedit /deletevalue useplatformclock`. | Auto-elevates. Reduces latency/stutter. |
 | **Disable-Online-Start-Menu-Search.ps1** | Disables Bing/Online results in Start Menu. | Sets `DisableSearchBoxSuggestions` = 1 in HKCU Policies. | Removes web results/weather from Start. |
 | **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | Sets `StartupDelayInMSec` & `WaitForIdleState` to 0. | May cause temporary lag at login. |
 | **Disable-Telemetry.ps1** | Reduces Windows tracking/telemetry. | Sets `AllowTelemetry`=0; Disables Advertising ID; Disables `DiagTrack`. | Auto-elevates. May break Intune/Insider builds. |
