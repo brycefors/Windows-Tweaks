@@ -23,6 +23,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 | **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | May cause temporary lag at login. |
 | **Disable-Telemetry.ps1** | Reduces Windows tracking/telemetry. | Auto-elevates. May break Intune/Insider builds. |
 | **Enable-Long-Paths.ps1** | Enables support for paths > 260 chars. | Auto-elevates. Useful for deep directory structures. |
+| **Enable-Quake-Mode.ps1** | Auto-starts Terminal in Quake mode. | Installs PowerShell 7 & Terminal if missing. |
 | **Enable-Seconds-On-Taskbar-Clock.ps1** | Shows seconds in the system tray clock. | Requires Explorer restart or sign out. |
 | **Reduce-Latency.ps1** | Optimizes network/system for gaming latency. | Auto-elevates. May increase battery usage. |
 
