@@ -15,7 +15,7 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
 
 $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $name = "WindowsTerminalQuake"
-$value = "wt.exe -w _quake pwsh -window minimized"
+$value = "wt.exe -w _quake pwsh -nologo -windowstyle hidden"
 
 # Explanation
 Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
