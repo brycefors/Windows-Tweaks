@@ -18,6 +18,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 | :--- | :--- | :--- | :--- |
 | **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Lowers heat and fan noise; can make sustained loads easier to manage. | May reduce peak performance because it suppresses Turbo Boost on many CPUs. |
 | **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Keeps apps current automatically with minimal manual effort. | Can add login-time disk/network activity and may install updates you did not want yet. |
+| **Disable-8Dot3-Filenames.ps1** | Disables 8.3 short filename generation. | Reduces file system overhead and improves performance by eliminating legacy name format creation. | Some legacy applications may depend on 8.3 filename support. |
 | **Disable-HPET.ps1** | Disables High Precision Event Timer and Dynamic Tick. | Can reduce latency or stutter on some systems. | Often has no measurable benefit and can cause timing issues on a few setups. |
 | **Disable-Memory-Integrity.ps1** | Turns off Memory Integrity (Core Isolation). | Can improve compatibility or reduce overhead on some systems. | Lowers kernel-level protection and weakens security against certain exploits. |
 | **Disable-MMAgent-MemoryCompression.ps1** | Disables Windows Memory Compression. | May reduce CPU overhead from memory compression on some machines. | Uses more RAM and can hurt performance on systems with limited memory. |
