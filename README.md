@@ -19,6 +19,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 | **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Disables Turbo Boost on many CPUs; reduces heat. |
 | **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Auto-elevates. Runs twice to handle dependencies. |
 | **Disable-HPET.ps1** | Disables High Precision Event Timer and Dynamic Tick. | Auto-elevates. Reduces latency/stutter. |
+| **Disable-MMAgent-MemoryCompression.ps1** | Disables Windows Memory Compression. | Auto-elevates. Requires a restart. |
 | **Disable-Online-Start-Menu-Search.ps1** | Disables Bing/Online results in Start Menu. | Removes web search results from Start Menu. |
 | **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | May cause temporary lag at login. |
 | **Disable-Telemetry.ps1** | Reduces Windows tracking/telemetry. | Auto-elevates. May break Intune/Insider builds. |
