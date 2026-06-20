@@ -14,19 +14,20 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 
 ## Scripts
 
-| Script | Purpose | Notes |
-| :--- | :--- | :--- |
-| **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Disables Turbo Boost on many CPUs; reduces heat. |
-| **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Auto-elevates. Runs twice to handle dependencies. |
-| **Disable-HPET.ps1** | Disables High Precision Event Timer and Dynamic Tick. | Auto-elevates. Reduces latency/stutter. |
-| **Disable-MMAgent-MemoryCompression.ps1** | Disables Windows Memory Compression. | Auto-elevates. Requires a restart. |
-| **Disable-Online-Start-Menu-Search.ps1** | Disables Bing/Online results in Start Menu. | Removes web search results from Start Menu. |
-| **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | May cause temporary lag at login. |
-| **Disable-Telemetry.ps1** | Reduces Windows tracking/telemetry. | Auto-elevates. May break Intune/Insider builds. |
-| **Enable-Long-Paths.ps1** | Enables support for paths > 260 chars. | Auto-elevates. Useful for deep directory structures. |
-| **Enable-Quake-Mode.ps1** | Auto-starts Terminal in Quake mode. | Installs PowerShell 7 & Terminal if missing. |
-| **Enable-Seconds-On-Taskbar-Clock.ps1** | Shows seconds in the system tray clock. | Requires Explorer restart or sign out. |
-| **Reduce-Latency.ps1** | Optimizes network/system for gaming latency. | Auto-elevates. May increase battery usage. |
+| Script | Purpose | Upside | Downside |
+| :--- | :--- | :--- | :--- |
+| **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Lowers heat and fan noise; can make sustained loads easier to manage. | May reduce peak performance because it suppresses Turbo Boost on many CPUs. |
+| **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Keeps apps current automatically with minimal manual effort. | Can add login-time disk/network activity and may install updates you did not want yet. |
+| **Disable-HPET.ps1** | Disables High Precision Event Timer and Dynamic Tick. | Can reduce latency or stutter on some systems. | Often has no measurable benefit and can cause timing issues on a few setups. |
+| **Disable-Memory-Integrity.ps1** | Turns off Memory Integrity (Core Isolation). | Can improve compatibility or reduce overhead on some systems. | Lowers kernel-level protection and weakens security against certain exploits. |
+| **Disable-MMAgent-MemoryCompression.ps1** | Disables Windows Memory Compression. | May reduce CPU overhead from memory compression on some machines. | Uses more RAM and can hurt performance on systems with limited memory. |
+| **Disable-Online-Start-Menu-Search.ps1** | Disables Bing/Online results in Start Menu. | Makes Start Menu search more private and local-only. | Removes web results and online suggestions from Start Menu search. |
+| **Disable-Startup-Delay.ps1** | Removes artificial startup delay. | Startup apps can launch sooner after sign-in. | Can cause a brief resource spike or lag while many startup apps open at once. |
+| **Disable-Telemetry.ps1** | Reduces Windows tracking/telemetry. | Reduces background reporting and some data collection. | Can interfere with Intune, Insider builds, diagnostics, or Microsoft-managed environments. |
+| **Enable-Long-Paths.ps1** | Enables support for paths > 260 chars. | Helps with deep folder structures and modern dev/build workflows. | Some legacy tools still assume the old path limit and may behave inconsistently. |
+| **Enable-Quake-Mode.ps1** | Auto-starts Terminal in Quake mode. | Gives fast drop-down terminal access at login. | Adds another startup component and may be unnecessary if you do not use Terminal often. |
+| **Enable-Seconds-On-Taskbar-Clock.ps1** | Shows seconds in the system tray clock. | Gives more precise time visibility without opening a clock app. | Adds visual clutter and requires an Explorer restart or sign-out to take effect. |
+| **Reduce-Latency.ps1** | Optimizes network/system for gaming latency. | Can improve responsiveness for latency-sensitive gaming or networking workloads. | May increase battery usage and can trade throughput or efficiency for lower latency. |
 
 ## How to Run
 
