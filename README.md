@@ -16,6 +16,8 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 
 | Script | Purpose | Upside | Downside |
 | :--- | :--- | :--- | :--- |
+| **Add-Daily-50Day-Uptime-Reboot-Task.ps1** | Reboots system when uptime reaches 50 days. | Enforces periodic restarts so monthly Windows updates/servicing finalize and long-uptime instability risk is reduced. | Forces reboot when threshold is hit, which can interrupt active work if users ignore the shutdown timer warning. |
+| **Add-Monthly-DISM-SFC-Task.ps1** | Schedules monthly DISM and SFC scans. | Automates periodic system image and file integrity repair checks with no manual effort. | Can take a long time and cause temporary CPU/disk usage spikes during scans. |
 | **Add-Optimized-PowerPlan.ps1** | Creates a heat-optimized power plan. | Lowers heat and fan noise; can make sustained loads easier to manage. | May reduce peak performance because it suppresses Turbo Boost on many CPUs. |
 | **Add-Winget-AutoUpdate-Task.ps1** | Auto-updates apps at login via Winget. | Keeps apps current automatically with minimal manual effort. | Can add login-time disk/network activity and may install updates you did not want yet. |
 | **Disable-8Dot3-Filenames.ps1** | Disables 8.3 short filename generation. | Reduces file system overhead and improves performance by eliminating legacy name format creation. | Some legacy applications may depend on 8.3 filename support. |
