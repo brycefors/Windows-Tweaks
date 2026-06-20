@@ -27,6 +27,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 | **Enable-Long-Paths.ps1** | Enables support for paths > 260 chars. | Helps with deep folder structures and modern dev/build workflows. | Some legacy tools still assume the old path limit and may behave inconsistently. |
 | **Enable-Quake-Mode.ps1** | Auto-starts Terminal in Quake mode. | Gives fast drop-down terminal access at login. | Adds another startup component and may be unnecessary if you do not use Terminal often. |
 | **Enable-Seconds-On-Taskbar-Clock.ps1** | Shows seconds in the system tray clock. | Gives more precise time visibility without opening a clock app. | Adds visual clutter and requires an Explorer restart or sign-out to take effect. |
+| **Optimize-FSUtil-MemoryUsage.ps1** | Optimizes file system memory usage (level 2). | Allows Windows to use more memory for file caching, improving disk I/O performance. | Can increase memory usage; may have minimal impact on systems with efficient caching already. |
 | **Reduce-Latency.ps1** | Optimizes network/system for gaming latency. | Can improve responsiveness for latency-sensitive gaming or networking workloads. | May increase battery usage and can trade throughput or efficiency for lower latency. |
 
 ## How to Run
