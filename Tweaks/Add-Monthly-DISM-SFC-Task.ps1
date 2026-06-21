@@ -42,54 +42,60 @@ Write-Host "Press any key to apply this tweak (or Ctrl+C to cancel)..." -Foregro
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
 # Logic
-$encodedBytes = [System.Text.Encoding]::Unicode.GetBytes($maintenanceCommand)
-$encodedCommand = [Convert]::ToBase64String($encodedBytes)
-$taskRunCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand"
+$taskArguments = "-NoProfile -ExecutionPolicy Bypass -Command `"$maintenanceCommand`""
 
 try {
-    $queryArgs = @('/Query', '/TN', $taskName)
-    $queryOutput = & schtasks.exe @queryArgs 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        $deleteArgs = @('/Delete', '/TN', $taskName, '/F')
-        $deleteOutput = & schtasks.exe @deleteArgs 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "Removed existing task: $taskName" -ForegroundColor Yellow
-        } else {
-            throw "schtasks delete failed: $deleteOutput"
-        }
+    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($null -ne $existingTask) {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
+        Write-Host "Removed existing task: $taskName" -ForegroundColor Yellow
     }
 
-    $createArgs = @(
-        '/Create', '/TN', $taskName,
-        '/SC', 'MONTHLY',
-        '/D', $runDay,
-        '/ST', $runTime,
-        '/RU', 'SYSTEM',
-        '/RL', 'HIGHEST',
-        '/F',
-        '/TR', $taskRunCommand
-    )
-    $createOutput = & schtasks.exe @createArgs 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        try {
-            $scheduleService = New-Object -ComObject "Schedule.Service"
-            $scheduleService.Connect()
-            $rootFolder = $scheduleService.GetFolder("\")
-            $registeredTask = $rootFolder.GetTask("\$taskName")
-            $taskDefinition = $registeredTask.Definition
-            $taskDefinition.RegistrationInfo.Description = $taskDescription
-
-            # 6 = TASK_CREATE_OR_UPDATE, 5 = TASK_LOGON_SERVICE_ACCOUNT
-            $null = $rootFolder.RegisterTaskDefinition($taskName, $taskDefinition, 6, "SYSTEM", $null, 5, $null)
-        } catch {
-            Write-Warning "Task created, but failed to set description: $_"
-        }
-
-        Write-Host "Successfully created Scheduled Task: $taskName" -ForegroundColor Green
-        Write-Host "The task will run monthly and execute DISM then SFC." -ForegroundColor White -BackgroundColor DarkGreen
-    } else {
-        throw "schtasks failed: $createOutput"
+    if ($runDay -lt 1 -or $runDay -gt 31) {
+        throw "runDay must be between 1 and 31."
     }
+
+    $runTimeDate = [DateTime]::ParseExact($runTime, 'HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)
+    $now = Get-Date
+    $daysInMonth = [DateTime]::DaysInMonth($now.Year, $now.Month)
+    $effectiveDay = [Math]::Min($runDay, $daysInMonth)
+    $startBoundaryDate = Get-Date -Year $now.Year -Month $now.Month -Day $effectiveDay -Hour $runTimeDate.Hour -Minute $runTimeDate.Minute -Second 0
+    if ($startBoundaryDate -le $now) {
+        $nextMonth = $now.AddMonths(1)
+        $daysInNextMonth = [DateTime]::DaysInMonth($nextMonth.Year, $nextMonth.Month)
+        $effectiveDay = [Math]::Min($runDay, $daysInNextMonth)
+        $startBoundaryDate = Get-Date -Year $nextMonth.Year -Month $nextMonth.Month -Day $effectiveDay -Hour $runTimeDate.Hour -Minute $runTimeDate.Minute -Second 0
+    }
+    $startBoundary = $startBoundaryDate.ToString('s')
+
+    $scheduleService = New-Object -ComObject "Schedule.Service"
+    $scheduleService.Connect()
+    $rootFolder = $scheduleService.GetFolder("\")
+    $taskDefinition = $scheduleService.NewTask(0)
+
+    $taskDefinition.RegistrationInfo.Description = $taskDescription
+    $taskDefinition.Settings.Enabled = $true
+    $taskDefinition.Settings.StartWhenAvailable = $true
+    $taskDefinition.Principal.UserId = "SYSTEM"
+    $taskDefinition.Principal.LogonType = 5
+    $taskDefinition.Principal.RunLevel = 1
+
+    # Monthly trigger: day-of-month and all months.
+    $monthlyTrigger = $taskDefinition.Triggers.Create(4)
+    $monthlyTrigger.StartBoundary = $startBoundary
+    $monthlyTrigger.DaysOfMonth = (1 -shl ($runDay - 1))
+    $monthlyTrigger.MonthsOfYear = 4095
+    $monthlyTrigger.Enabled = $true
+
+    $taskAction = $taskDefinition.Actions.Create(0)
+    $taskAction.Path = "powershell.exe"
+    $taskAction.Arguments = $taskArguments
+
+    # 6 = TASK_CREATE_OR_UPDATE, 5 = TASK_LOGON_SERVICE_ACCOUNT
+    $null = $rootFolder.RegisterTaskDefinition($taskName, $taskDefinition, 6, "SYSTEM", $null, 5, $null)
+
+    Write-Host "Successfully created Scheduled Task: $taskName" -ForegroundColor Green
+    Write-Host "The task will run monthly and execute DISM then SFC." -ForegroundColor White -BackgroundColor DarkGreen
 } catch {
     Write-Error "Failed to create Scheduled Task: $_"
     Write-Host "Ensure you have permissions to create Scheduled Tasks." -ForegroundColor Yellow
