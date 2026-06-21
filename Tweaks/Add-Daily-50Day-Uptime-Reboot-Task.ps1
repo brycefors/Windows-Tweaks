@@ -47,11 +47,11 @@ $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 $taskScript = @"
 `$uptimeDays = ((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalDays
 if (`$uptimeDays -ge $ThresholdDays) {
-    shutdown.exe /r /t $RebootDelaySeconds /c "System uptime reached $ThresholdDays days. Rebooting for monthly patch hygiene and stability."
+    shutdown.exe /r /t $RebootDelaySeconds /c 'System uptime reached $ThresholdDays days. Rebooting for monthly patch hygiene and stability.'
 }
 "@
-$encodedTaskScript = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($taskScript))
-$taskArguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand $encodedTaskScript"
+$escapedTaskScript = $taskScript.Replace('"', '`"').Replace("`r`n", '; ').Replace("`n", '; ')
+$taskArguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"$escapedTaskScript`""
 
 try {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
