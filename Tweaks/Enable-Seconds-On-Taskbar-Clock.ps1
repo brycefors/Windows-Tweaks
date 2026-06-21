@@ -42,8 +42,8 @@ if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
     New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS -ErrorAction Stop | Out-Null
 }
 
-# Get all user SIDs from the registry
-$userSIDs = Get-ChildItem "HKU:\" | Where-Object { $_.PSChildName -match '^S-1-5-21-' -and $_.PSChildName -notlike '*_Classes' } | Select-Object -ExpandProperty PSChildName
+# Get all user SIDs from the registry, including Microsoft account / Entra-backed profiles.
+$userSIDs = Get-ChildItem "HKU:\" | Where-Object { $_.PSChildName -match '^(S-1-5-21-|S-1-12-1-)' -and $_.PSChildName -notlike '*_Classes' } | Select-Object -ExpandProperty PSChildName
 
 # Add the default user profile
 $allProfiles = @('.DEFAULT') + $userSIDs
