@@ -128,7 +128,9 @@ if (-not $matchedServices) {
 $targetTaskName = "SupportAssistAgent AutoUpdate"
 try {
 	$matchingTasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $targetTaskName }
-	if ($matchingTasks) {
+	if (-not $matchingTasks) {
+	#	Write-Host "Scheduled task not found: $targetTaskName" -ForegroundColor Yellow
+	} else {
 		$taskDisabledCount = 0
 		$taskAlreadyDisabledCount = 0
 
@@ -312,13 +314,18 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 	)
 
 	$appxRemovedCount = 0
+	$appxNotFoundCount = 0
 
 	foreach ($appxName in $targetAppxNames) {
 		$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
 		$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
 			Where-Object { $_.DisplayName -like $appxName }
 
-		if ($packages -or $provisionedPackages) {
+		if (-not $packages -and -not $provisionedPackages) {
+		#	Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
+			$appxNotFoundCount++
+			continue
+		}
 
 		foreach ($pkg in $packages) {
 			try {
@@ -342,6 +349,9 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 	}
 
 	Write-Host "Removed $appxRemovedCount AppX package(s)." -ForegroundColor Green
+	if ($appxNotFoundCount -gt 0) {
+	#	Write-Host "$appxNotFoundCount AppX package name(s) not found on this system." -ForegroundColor Yellow
+	}
 
 	# Remove SupportAssist-related directories.
 	$dirsToRemove = @(
