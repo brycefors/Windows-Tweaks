@@ -308,8 +308,8 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 
 	# Remove Dell SupportAssist AppX packages (store/modern app installs).
 	$targetAppxNames = @(
-		"DellInc.DellSupportAssistforPCs",
-		"DellInc.DellSupportAssist"
+		"*DellSupportAssistforPCs*",
+		"*DellSupportAssist"
 	)
 
 	$appxRemovedCount = 0
@@ -318,7 +318,7 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 	foreach ($appxName in $targetAppxNames) {
 		$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
 		$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-			Where-Object { $_.DisplayName -eq $appxName }
+			Where-Object { $_.DisplayName -like $appxName }
 
 		if (-not $packages -and -not $provisionedPackages) {
 			Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
