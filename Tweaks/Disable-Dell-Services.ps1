@@ -128,9 +128,7 @@ if (-not $matchedServices) {
 $targetTaskName = "SupportAssistAgent AutoUpdate"
 try {
 	$matchingTasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $targetTaskName }
-	if (-not $matchingTasks) {
-		Write-Host "Scheduled task not found: $targetTaskName" -ForegroundColor Yellow
-	} else {
+	if ($matchingTasks) {
 		$taskDisabledCount = 0
 		$taskAlreadyDisabledCount = 0
 
@@ -314,18 +312,13 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 	)
 
 	$appxRemovedCount = 0
-	$appxNotFoundCount = 0
 
 	foreach ($appxName in $targetAppxNames) {
 		$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
 		$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
 			Where-Object { $_.DisplayName -like $appxName }
 
-		if (-not $packages -and -not $provisionedPackages) {
-			Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
-			$appxNotFoundCount++
-			continue
-		}
+		if ($packages -or $provisionedPackages) {
 
 		foreach ($pkg in $packages) {
 			try {
@@ -349,8 +342,32 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 	}
 
 	Write-Host "Removed $appxRemovedCount AppX package(s)." -ForegroundColor Green
-	if ($appxNotFoundCount -gt 0) {
-		Write-Host "$appxNotFoundCount AppX package name(s) not found on this system." -ForegroundColor Yellow
+
+	# Remove SupportAssist-related directories.
+	$dirsToRemove = @(
+		"$env:ProgramFiles\Dell\SupportAssist",
+		"${env:ProgramFiles(x86)}\Dell\SupportAssist",
+		"$env:ProgramData\Dell\SupportAssist",
+		"$env:ProgramData\Dell\SARemediation",
+		"$env:AppData\Dell\SupportAssist",
+		"$env:LocalAppData\Dell\SupportAssist"
+	)
+
+	$dirRemovedCount = 0
+	foreach ($dir in $dirsToRemove) {
+		if (Test-Path $dir) {
+			try {
+				Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
+				Write-Host "Removed directory: $dir" -ForegroundColor Green
+				$dirRemovedCount++
+			} catch {
+				Write-Warning "Failed to remove directory '$dir': $_"
+			}
+		}
+	}
+
+	if ($dirRemovedCount -gt 0) {
+		Write-Host "Removed $dirRemovedCount SupportAssist directory(ies)." -ForegroundColor Green
 	}
 } else {
 	Write-Host "Skipped uninstall of Dell SupportAssist components." -ForegroundColor Yellow
