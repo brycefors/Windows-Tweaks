@@ -64,7 +64,7 @@ $targetNames = @(
 	"DellTrustedDeviceAgent",
 	"DellOptimizer",
 	"DellOptimizerService",
-#	"DellClientManagementService", # May break Dell peripherals management if disabled.
+#	"DellClientManagementService", # Needed for Dell peripheral and Dell Command suite.
 #	"Dell.TechHub", # May break Dell peripherals management if disabled.
 	"DDVCollectorSvcApi",
 	"DDVDataCollector",
@@ -82,7 +82,7 @@ $targetDisplayNames = @(
 	"Dell Data Vault Collector",
 	"Dell Data Vault Processor",
 	"Dell Data Vault Service API",
-#	"Dell Client Management Service", # May break Dell peripherals management if disabled.
+#	"Dell Client Management Service", # Needed for Dell peripheral and Dell Command suite.
 #	"Dell TechHub", # May break Dell peripherals management if disabled.
 	"Dell Digital Delivery Services"
 )
