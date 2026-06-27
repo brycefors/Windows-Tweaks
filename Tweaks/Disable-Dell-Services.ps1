@@ -33,7 +33,9 @@ Write-Host ""
 Write-Host "Actions:"
 Write-Host "1. Stops matching Dell services if currently running."
 Write-Host "2. Sets their startup type to Disabled."
-Write-Host "3. Optionally removes Dell pinned taskbar icons for all users."
+Write-Host "3. Disables Dell SupportAssistAgent AutoUpdate scheduled task."
+Write-Host "4. Optionally removes Dell pinned taskbar icons for all users."
+Write-Host "5. Optionally uninstalls Dell SupportAssist components."
 Write-Host ""
 Write-Host "Targeted services can include:"
 Write-Host "  - Dell SupportAssist"
@@ -47,6 +49,7 @@ Write-Host "  - Dell Digital Delivery"
 Write-Host ""
 Write-Host "NOTE: If you rely on Dell SupportAssist automation, this may remove" -ForegroundColor Yellow
 Write-Host "its automatic diagnostics/update behavior." -ForegroundColor Yellow
+Write-Host "Some services may not stop completely until after a restart." -ForegroundColor Yellow
 Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
 
 # Pause for user to read
@@ -93,8 +96,17 @@ if (-not $matchedServices) {
 	Write-Host "No targeted Dell annoyance services were found on this system." -ForegroundColor Yellow
 } else {
 	$disabledCount = 0
+	$alreadyDisabledCount = 0
 	foreach ($svc in $matchedServices) {
 		try {
+			$svcEscapedName = $svc.Name.Replace("'", "''")
+			$svcDetails = Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcEscapedName'" -ErrorAction SilentlyContinue
+			if ($svcDetails -and $svcDetails.StartMode -eq 'Disabled') {
+				Write-Host "Already disabled: $($svc.DisplayName) [$($svc.Name)]" -ForegroundColor Yellow
+				$alreadyDisabledCount++
+				continue
+			}
+
 			if ($svc.Status -ne 'Stopped') {
 				Stop-Service -Name $svc.Name -Force -ErrorAction SilentlyContinue
 			}
@@ -109,6 +121,36 @@ if (-not $matchedServices) {
 
 	Write-Host ""
 	Write-Host "Successfully disabled $disabledCount service(s)." -ForegroundColor Green
+	Write-Host "Already disabled $alreadyDisabledCount service(s)." -ForegroundColor Yellow
+}
+
+# Disable Dell SupportAssistAgent AutoUpdate scheduled task if present.
+$targetTaskName = "SupportAssistAgent AutoUpdate"
+try {
+	$matchingTasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $targetTaskName }
+	if (-not $matchingTasks) {
+		Write-Host "Scheduled task not found: $targetTaskName" -ForegroundColor Yellow
+	} else {
+		$taskDisabledCount = 0
+		$taskAlreadyDisabledCount = 0
+
+		foreach ($task in $matchingTasks) {
+			if ($task.State -eq 'Disabled') {
+				Write-Host "Task already disabled: $($task.TaskPath)$($task.TaskName)" -ForegroundColor Yellow
+				$taskAlreadyDisabledCount++
+				continue
+			}
+
+			Disable-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -ErrorAction Stop | Out-Null
+			Write-Host "Disabled scheduled task: $($task.TaskPath)$($task.TaskName)" -ForegroundColor Green
+			$taskDisabledCount++
+		}
+
+		Write-Host "Disabled $taskDisabledCount scheduled task(s): $targetTaskName" -ForegroundColor Green
+		Write-Host "Already disabled $taskAlreadyDisabledCount scheduled task(s): $targetTaskName" -ForegroundColor Yellow
+	}
+} catch {
+	Write-Warning "Failed while processing scheduled task '$targetTaskName': $_"
 }
 
 # Optional: remove Dell-related pinned taskbar shortcuts for all local users.
@@ -187,6 +229,86 @@ if ($removeTaskbarIconsResponse -match '^[Yy]') {
 	Write-Host "Skipped taskbar icon removal." -ForegroundColor Yellow
 }
 
+# Optional: uninstall Dell SupportAssist and Dell SupportAssist Remediation.
+Write-Host ""
+$uninstallSupportAssistResponse = Read-Host "Uninstall Dell SupportAssist and Dell SupportAssist Remediation now? (Y/N)"
+if ($uninstallSupportAssistResponse -match '^[Yy]') {
+	$uninstallRegistryPaths = @(
+		"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+		"HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+	)
+
+	$targetAppNames = @(
+		"Dell SupportAssist",
+		"Dell SupportAssist Remediation"
+	)
+
+	$appEntries = foreach ($path in $uninstallRegistryPaths) {
+		Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
+			Where-Object {
+				$_.DisplayName -and ($targetAppNames -contains $_.DisplayName)
+			} |
+			Select-Object DisplayName, QuietUninstallString, UninstallString
+	}
+	$appEntries = $appEntries | Sort-Object DisplayName -Unique
+
+	if (-not $appEntries) {
+		Write-Host "No matching Dell SupportAssist uninstall entries found." -ForegroundColor Yellow
+	} else {
+		$uninstallSuccessCount = 0
+		$uninstallFailedCount = 0
+
+		foreach ($app in $appEntries) {
+			$commandToRun = $null
+			if ($app.QuietUninstallString) {
+				$commandToRun = $app.QuietUninstallString
+			} elseif ($app.UninstallString) {
+				$commandToRun = $app.UninstallString
+			}
+
+			if (-not $commandToRun) {
+				Write-Warning "No uninstall command found for '$($app.DisplayName)'."
+				$uninstallFailedCount++
+				continue
+			}
+
+			# Make MSI uninstall commands non-interactive when possible.
+			if ($commandToRun -match '(?i)msiexec(\.exe)?') {
+				$commandToRun = $commandToRun -replace '(?i)\s/I\s', ' /X '
+				if ($commandToRun -notmatch '(?i)\s/q') {
+					$commandToRun += ' /qn'
+				}
+				if ($commandToRun -notmatch '(?i)norestart') {
+					$commandToRun += ' /norestart'
+				}
+			}
+
+			try {
+				Write-Host "Uninstalling: $($app.DisplayName)" -ForegroundColor White
+				$proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $commandToRun -Wait -PassThru -WindowStyle Hidden -ErrorAction Stop
+				if ($proc.ExitCode -eq 0) {
+					Write-Host "Uninstalled: $($app.DisplayName)" -ForegroundColor Green
+					$uninstallSuccessCount++
+				} else {
+					Write-Warning "Uninstall returned exit code $($proc.ExitCode) for '$($app.DisplayName)'."
+					$uninstallFailedCount++
+				}
+			} catch {
+				Write-Warning "Failed to uninstall '$($app.DisplayName)': $_"
+				$uninstallFailedCount++
+			}
+		}
+
+		Write-Host "Uninstalled $uninstallSuccessCount application(s)." -ForegroundColor Green
+		if ($uninstallFailedCount -gt 0) {
+			Write-Host "Failed to uninstall $uninstallFailedCount application(s)." -ForegroundColor Yellow
+		}
+	}
+} else {
+	Write-Host "Skipped uninstall of Dell SupportAssist components." -ForegroundColor Yellow
+}
+
 Write-Host "You may need to restart your computer for changes to take effect." -ForegroundColor White -BackgroundColor DarkGreen
+Write-Host "A restart may be required for all targeted services to stop completely." -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "Press any key to exit..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
