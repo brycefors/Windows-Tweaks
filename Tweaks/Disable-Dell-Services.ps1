@@ -35,7 +35,7 @@ Write-Host "1. Stops matching Dell services if currently running."
 Write-Host "2. Sets their startup type to Disabled."
 Write-Host "3. Disables Dell SupportAssistAgent AutoUpdate scheduled task."
 Write-Host "4. Optionally removes Dell pinned taskbar icons for all users."
-Write-Host "5. Optionally uninstalls Dell SupportAssist components."
+Write-Host "5. Optionally uninstalls Dell SupportAssist components (registry-based and AppX)."
 Write-Host ""
 Write-Host "Targeted services can include:"
 Write-Host "  - Dell SupportAssist"
@@ -229,7 +229,7 @@ if ($removeTaskbarIconsResponse -match '^[Yy]') {
 	Write-Host "Skipped taskbar icon removal." -ForegroundColor Yellow
 }
 
-# Optional: uninstall Dell SupportAssist and Dell SupportAssist Remediation.
+# Optional: uninstall Dell SupportAssist components (registry-based and AppX).
 Write-Host ""
 $uninstallSupportAssistResponse = Read-Host "Uninstall Dell SupportAssist and Dell SupportAssist Remediation now? (Y/N)"
 if ($uninstallSupportAssistResponse -match '^[Yy]') {
@@ -240,7 +240,8 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 
 	$targetAppNames = @(
 		"Dell SupportAssist",
-		"Dell SupportAssist Remediation"
+		"Dell SupportAssist Remediation",
+		"Dell SupportAssist OS Recovery Plugin for Dell Update"
 	)
 
 	$appEntries = foreach ($path in $uninstallRegistryPaths) {
@@ -303,6 +304,52 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 		if ($uninstallFailedCount -gt 0) {
 			Write-Host "Failed to uninstall $uninstallFailedCount application(s)." -ForegroundColor Yellow
 		}
+	}
+
+	# Remove Dell SupportAssist AppX packages (store/modern app installs).
+	$targetAppxNames = @(
+		"DellInc.DellSupportAssistforPCs",
+		"DellInc.DellSupportAssist"
+	)
+
+	$appxRemovedCount = 0
+	$appxNotFoundCount = 0
+
+	foreach ($appxName in $targetAppxNames) {
+		$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
+		$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+			Where-Object { $_.DisplayName -eq $appxName }
+
+		if (-not $packages -and -not $provisionedPackages) {
+			Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
+			$appxNotFoundCount++
+			continue
+		}
+
+		foreach ($pkg in $packages) {
+			try {
+				Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
+				Write-Host "Removed AppX package: $($pkg.Name) ($($pkg.PackageUserInformation.UserSecurityId -join ', '))" -ForegroundColor Green
+				$appxRemovedCount++
+			} catch {
+				Write-Warning "Failed to remove AppX package '$($pkg.PackageFullName)': $_"
+			}
+		}
+
+		foreach ($provPkg in $provisionedPackages) {
+			try {
+				Remove-AppxProvisionedPackage -Online -PackageName $provPkg.PackageName -ErrorAction Stop | Out-Null
+				Write-Host "Removed provisioned AppX package: $($provPkg.DisplayName)" -ForegroundColor Green
+				$appxRemovedCount++
+			} catch {
+				Write-Warning "Failed to remove provisioned AppX package '$($provPkg.PackageName)': $_"
+			}
+		}
+	}
+
+	Write-Host "Removed $appxRemovedCount AppX package(s)." -ForegroundColor Green
+	if ($appxNotFoundCount -gt 0) {
+		Write-Host "$appxNotFoundCount AppX package name(s) not found on this system." -ForegroundColor Yellow
 	}
 } else {
 	Write-Host "Skipped uninstall of Dell SupportAssist components." -ForegroundColor Yellow
