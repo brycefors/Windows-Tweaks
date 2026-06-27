@@ -308,8 +308,9 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 
 	# Remove Dell SupportAssist AppX packages (store/modern app installs).
 	$targetAppxNames = @(
-		"*DellSupportAssistforPCs*",
-		"*DellSupportAssist"
+		"*DellSupportAssist*"
+		"Dell.SupportAssist*"
+		"DellInc.SupportAssist*"
 	)
 
 	$appxRemovedCount = 0
