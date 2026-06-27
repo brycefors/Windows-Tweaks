@@ -125,7 +125,7 @@ if (-not $matchedServices) {
 }
 
 # Disable Dell SupportAssistAgent AutoUpdate scheduled task if present.
-$targetTaskName = "SupportAssistAgent AutoUpdate"
+$targetTaskName = "Dell SupportAssistAgent AutoUpdate"
 try {
 	$matchingTasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -eq $targetTaskName }
 	if (-not $matchingTasks) {
