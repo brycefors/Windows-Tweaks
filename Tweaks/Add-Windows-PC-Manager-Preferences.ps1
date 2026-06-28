@@ -22,8 +22,8 @@ Write-Host "----------------------------------------------------------------" -F
 Write-Host "                       EXPLANATION                              " -ForegroundColor Cyan
 Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
 Write-Host "This script performs the following:"
-Write-Host "1. Verifies whether Windows PC Manager is already installed."
-Write-Host "2. Installs Windows PC Manager via Winget only if missing."
+Write-Host "1. Verifies whether Microsoft PC Manager is already installed."
+Write-Host "2. Installs Microsoft PC Manager via Winget only if missing."
 Write-Host "3. Updates PC Manager preferences to enable three settings:"
 Write-Host "   - AutoUpdate = true"
 Write-Host "   - SelfStart = true"
@@ -41,7 +41,7 @@ $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 function Test-PCManagerInstalled {
     try {
         $startApp = Get-StartApps -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match "PC Manager|Microsoft PC Manager|Windows PC Manager"
+            $_.Name -match "PC Manager|Microsoft PC Manager"
         } | Select-Object -First 1
         if ($null -ne $startApp) {
             return $true
@@ -63,16 +63,16 @@ function Test-PCManagerInstalled {
 }
 
 if (Test-PCManagerInstalled) {
-    Write-Host "Windows PC Manager is already installed. Skipping install step." -ForegroundColor Green
+    Write-Host "Microsoft PC Manager is already installed. Skipping install step." -ForegroundColor Green
 } else {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-Error "Windows PC Manager is not installed and Winget is unavailable. Install App Installer / Winget and retry."
+        Write-Error "Microsoft PC Manager is not installed and Winget is unavailable. Install App Installer / Winget and retry."
         Write-Host "Press any key to exit..."
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         exit 1
     }
 
-    Write-Host "Windows PC Manager not found. Installing via Winget..." -ForegroundColor White
+    Write-Host "Microsoft PC Manager not found. Installing via Winget..." -ForegroundColor White
     try {
         $installArgs = @(
             "install",
@@ -90,9 +90,9 @@ if (Test-PCManagerInstalled) {
             throw "Winget install failed for $pcManagerPackageId. Exit code: $installExitCode"
         }
 
-        Write-Host "Windows PC Manager install step completed." -ForegroundColor Green
+        Write-Host "Microsoft PC Manager install step completed." -ForegroundColor Green
     } catch {
-        Write-Error "Failed to install Windows PC Manager: $_"
+        Write-Error "Failed to install Microsoft PC Manager: $_"
         Write-Host "Press any key to exit..."
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         exit 1
@@ -156,7 +156,7 @@ try {
 
     try {
         $pcManagerApp = Get-StartApps -ErrorAction Stop | Where-Object {
-            $_.Name -match "PC Manager|Microsoft PC Manager|Windows PC Manager"
+            $_.Name -match "PC Manager|Microsoft PC Manager"
         } | Select-Object -First 1
 
         if ($null -ne $pcManagerApp -and -not [string]::IsNullOrWhiteSpace($pcManagerApp.AppID)) {
