@@ -50,7 +50,7 @@ A collection of PowerShell scripts designed to optimize Windows performance, red
 > **Note:** A **system restart** is recommended after running these scripts (especially `Reduce-Latency.ps1` and `Disable-Startup-Delay.ps1`) to ensure all registry changes and service configurations take effect.
 
 ### Troubleshooting
-If you see an error stating that "running scripts is disabled on this system", you can run the script with the Execution Policy bypass flag:
+If you see an error stating that "running scripts is disabled on this system", or if the script immediately closes after running, you can run the script with the Execution Policy bypass flag:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Disable-Startup-Delay.ps1
