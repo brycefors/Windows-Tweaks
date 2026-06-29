@@ -9,9 +9,12 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
 	$processInfo.FileName = "powershell.exe"
 	$processInfo.Arguments = "-File `"$($MyInvocation.MyCommand.Path)`""
 	$processInfo.Verb = "RunAs"
-	$process = [System.Diagnostics.Process]::Start($processInfo)
+	[System.Diagnostics.Process]::Start($processInfo) | Out-Null
 	exit
 }
+
+# Set to $true to automatically confirm all optional actions without prompting.
+$AutoConfirm = $false
 
 # Only proceed on Dell systems.
 $system = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
@@ -36,6 +39,7 @@ Write-Host "2. Sets their startup type to Disabled."
 Write-Host "3. Disables Dell SupportAssistAgent AutoUpdate scheduled task."
 Write-Host "4. Optionally removes Dell pinned taskbar icons for all users."
 Write-Host "5. Optionally uninstalls Dell SupportAssist components (registry-based and AppX)."
+Write-Host "6. Optionally uninstalls Cirrus Logic audio drivers and software."
 Write-Host ""
 Write-Host "Targeted services can include:"
 Write-Host "  - Dell SupportAssist"
@@ -153,113 +157,121 @@ try {
 	Write-Warning "Failed while processing scheduled task '$targetTaskName': $_"
 }
 
-# Optional: remove Dell-related pinned taskbar shortcuts for all local users.
+# --- SCAN FOR OPTIONAL ITEMS ---
 Write-Host ""
-$removeTaskbarIconsResponse = Read-Host "Remove Dell icons from taskbar for all users on this machine? (Y/N)"
-if ($removeTaskbarIconsResponse -match '^[Yy]') {
-	$shell = New-Object -ComObject WScript.Shell
-	$taskbarRemovedCount = 0
-	$profilesTouched = 0
+Write-Host "Scanning for optional cleanup items..." -ForegroundColor Cyan
 
-	$profileListRoot = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
-	$profilePaths = @()
-	if (Test-Path $profileListRoot) {
-		$profilePaths = Get-ChildItem -Path $profileListRoot -ErrorAction SilentlyContinue |
-			ForEach-Object {
-				(Get-ItemProperty -Path $_.PSPath -Name ProfileImagePath -ErrorAction SilentlyContinue).ProfileImagePath
-			} |
-			Where-Object { $_ } |
-			ForEach-Object { [Environment]::ExpandEnvironmentVariables($_) } |
-			Where-Object { (Test-Path $_) -and ($_ -notmatch '(?i)\\Windows\\System32\\config\\systemprofile$') } |
-			Sort-Object -Unique
-	}
+# Scan for Dell taskbar icons
+$dellTaskbarIconsFound = $false
+$taskbarIconPaths = @()
+$profileListRoot = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+if (Test-Path $profileListRoot) {
+	$profilePaths = Get-ChildItem -Path $profileListRoot -ErrorAction SilentlyContinue |
+		ForEach-Object {
+			(Get-ItemProperty -Path $_.PSPath -Name ProfileImagePath -ErrorAction SilentlyContinue).ProfileImagePath
+		} |
+		Where-Object { $_ } |
+		ForEach-Object { [Environment]::ExpandEnvironmentVariables($_) } |
+		Where-Object { (Test-Path $_) -and ($_ -notmatch '(?i)\\Windows\\System32\\config\\systemprofile$') } |
+		Sort-Object -Unique
 
-	# Include Default profile so future users don't inherit Dell taskbar pins.
 	$defaultProfilePath = Join-Path $env:SystemDrive "Users\Default"
 	if (Test-Path $defaultProfilePath) {
 		$profilePaths += $defaultProfilePath
 	}
 	$profilePaths = $profilePaths | Sort-Object -Unique
 
-	if (-not $profilePaths) {
-		Write-Host "No eligible user profiles found." -ForegroundColor Yellow
-	} else {
-		foreach ($profilePath in $profilePaths) {
-			$taskbarPinnedPath = Join-Path $profilePath "AppData\Roaming\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
-			if (-not (Test-Path $taskbarPinnedPath)) {
-				continue
-			}
-
-			$profilesTouched++
+	foreach ($profilePath in $profilePaths) {
+		$taskbarPinnedPath = Join-Path $profilePath "AppData\Roaming\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+		if (Test-Path $taskbarPinnedPath) {
 			$taskbarLinks = Get-ChildItem -Path $taskbarPinnedPath -Filter "*.lnk" -File -ErrorAction SilentlyContinue
-
 			foreach ($link in $taskbarLinks) {
-				$removeLink = $false
-
 				if ($link.Name -match '(?i)dell|supportassist|optimizer|trusted') {
-					$removeLink = $true
-				} else {
-					try {
-						$shortcut = $shell.CreateShortcut($link.FullName)
-						if ($shortcut.TargetPath -and $shortcut.TargetPath -match '(?i)dell|supportassist|optimizer|trusted') {
-							$removeLink = $true
-						}
-					} catch {
-						Write-Warning "Could not inspect taskbar shortcut '$($link.FullName)': $_"
-					}
-				}
-
-				if ($removeLink) {
-					try {
-						Remove-Item -Path $link.FullName -Force -ErrorAction Stop
-						Write-Host "Removed taskbar shortcut: $($link.FullName)" -ForegroundColor Green
-						$taskbarRemovedCount++
-					} catch {
-						Write-Warning "Failed to remove taskbar shortcut '$($link.FullName)': $_"
-					}
+					$dellTaskbarIconsFound = $true
+					$taskbarIconPaths += $link.FullName
 				}
 			}
 		}
+	}
+}
 
-		Write-Host "Processed $profilesTouched profile(s)." -ForegroundColor Green
+# Scan for Dell SupportAssist packages
+$supportAssistPackagesFound = @()
+$uninstallRegistryPaths = @(
+	"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+	"HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+)
+$targetAppNames = @(
+	"Dell SupportAssist",
+	"Dell SupportAssist Remediation",
+	"Dell SupportAssist OS Recovery Plugin for Dell Update"
+)
+foreach ($path in $uninstallRegistryPaths) {
+	$appEntries = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
+		Where-Object {
+			$_.DisplayName -and ($targetAppNames -contains $_.DisplayName)
+		} |
+		Select-Object DisplayName, QuietUninstallString, UninstallString
+	$supportAssistPackagesFound += $appEntries
+}
+$supportAssistPackagesFound = $supportAssistPackagesFound | Sort-Object DisplayName -Unique
+
+# Scan for Cirrus Logic packages
+$cirrusPackagesFound = @()
+foreach ($regPath in $uninstallRegistryPaths) {
+	if (Test-Path $regPath) {
+		$items = Get-ChildItem $regPath -ErrorAction SilentlyContinue
+		foreach ($item in $items) {
+			$displayName = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).DisplayName
+			if ($displayName -match "Cirrus" -or $displayName -match "CirrusLogic") {
+				$cirrusPackagesFound += @{
+					Path = $item.PSPath
+					Name = $displayName
+					UninstallString = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).UninstallString
+				}
+			}
+		}
+	}
+}
+
+Write-Host "Scan complete." -ForegroundColor Green
+Write-Host ""
+
+if (-not $AutoConfirm) {
+	$autoConfirmResponse = Read-Host "Auto-confirm all optional cleanup actions? (Y/N)"
+	if ($autoConfirmResponse -match '^[Yy]') {
+		$AutoConfirm = $true
+	}
+}
+Write-Host ""
+
+# Optional: remove Dell-related pinned taskbar shortcuts for all local users.
+if ($dellTaskbarIconsFound) {
+	if ($AutoConfirm -or (Read-Host "Found Dell taskbar icons. Remove them for all users on this machine? (Y/N)") -match '^[Yy]') {
+		$taskbarRemovedCount = 0
+
+		foreach ($link in $taskbarIconPaths) {
+			try {
+				Remove-Item -Path $link -Force -ErrorAction Stop
+				Write-Host "Removed taskbar shortcut: $link" -ForegroundColor Green
+				$taskbarRemovedCount++
+			} catch {
+				Write-Warning "Failed to remove taskbar shortcut '$link': $_"
+			}
+		}
+
 		Write-Host "Removed $taskbarRemovedCount Dell-related taskbar shortcut(s)." -ForegroundColor Green
 		Write-Host "If taskbar icons do not refresh immediately, restart Explorer or sign out/in." -ForegroundColor Yellow
 	}
-} else {
-	Write-Host "Skipped taskbar icon removal." -ForegroundColor Yellow
 }
 
 # Optional: uninstall Dell SupportAssist components (registry-based and AppX).
-Write-Host ""
-$uninstallSupportAssistResponse = Read-Host "Uninstall Dell SupportAssist and Dell SupportAssist Remediation now? (Y/N)"
-if ($uninstallSupportAssistResponse -match '^[Yy]') {
-	$uninstallRegistryPaths = @(
-		"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-		"HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-	)
-
-	$targetAppNames = @(
-		"Dell SupportAssist",
-		"Dell SupportAssist Remediation",
-		"Dell SupportAssist OS Recovery Plugin for Dell Update"
-	)
-
-	$appEntries = foreach ($path in $uninstallRegistryPaths) {
-		Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
-			Where-Object {
-				$_.DisplayName -and ($targetAppNames -contains $_.DisplayName)
-			} |
-			Select-Object DisplayName, QuietUninstallString, UninstallString
-	}
-	$appEntries = $appEntries | Sort-Object DisplayName -Unique
-
-	if (-not $appEntries) {
-		Write-Host "No matching Dell SupportAssist uninstall entries found." -ForegroundColor Yellow
-	} else {
+if ($supportAssistPackagesFound.Count -gt 0) {
+	if ($AutoConfirm -or (Read-Host "Found Dell SupportAssist packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
 		$uninstallSuccessCount = 0
 		$uninstallFailedCount = 0
 
-		foreach ($app in $appEntries) {
+		foreach ($app in $supportAssistPackagesFound) {
 			$commandToRun = $null
 			if ($app.QuietUninstallString) {
 				$commandToRun = $app.QuietUninstallString
@@ -304,85 +316,166 @@ if ($uninstallSupportAssistResponse -match '^[Yy]') {
 		if ($uninstallFailedCount -gt 0) {
 			Write-Host "Failed to uninstall $uninstallFailedCount application(s)." -ForegroundColor Yellow
 		}
-	}
 
-	# Remove Dell SupportAssist AppX packages (store/modern app installs).
-	$targetAppxNames = @(
-		"*DellSupportAssist*"
-		"Dell.SupportAssist*"
-		"DellInc.SupportAssist*"
-	)
+		# Remove Dell SupportAssist AppX packages (store/modern app installs).
+		$targetAppxNames = @(
+			"*DellSupportAssist*"
+			"Dell.SupportAssist*"
+			"DellInc.SupportAssist*"
+		)
 
-	$appxRemovedCount = 0
-	$appxNotFoundCount = 0
+		$appxRemovedCount = 0
+		$appxNotFoundCount = 0
 
-	foreach ($appxName in $targetAppxNames) {
-		$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
-		$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-			Where-Object { $_.DisplayName -like $appxName }
+		foreach ($appxName in $targetAppxNames) {
+			$packages = Get-AppxPackage -Name $appxName -AllUsers -ErrorAction SilentlyContinue
+			$provisionedPackages = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+				Where-Object { $_.DisplayName -like $appxName }
 
-		if (-not $packages -and -not $provisionedPackages) {
-		#	Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
-			$appxNotFoundCount++
-			continue
-		}
+			if (-not $packages -and -not $provisionedPackages) {
+			#	Write-Host "AppX package not found: $appxName" -ForegroundColor Yellow
+				$appxNotFoundCount++
+				continue
+			}
 
-		foreach ($pkg in $packages) {
-			try {
-				Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
-				Write-Host "Removed AppX package: $($pkg.Name) ($($pkg.PackageUserInformation.UserSecurityId -join ', '))" -ForegroundColor Green
-				$appxRemovedCount++
-			} catch {
-				Write-Warning "Failed to remove AppX package '$($pkg.PackageFullName)': $_"
+			foreach ($pkg in $packages) {
+				try {
+					Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
+					Write-Host "Removed AppX package: $($pkg.Name) ($($pkg.PackageUserInformation.UserSecurityId -join ', '))" -ForegroundColor Green
+					$appxRemovedCount++
+				} catch {
+					Write-Warning "Failed to remove AppX package '$($pkg.PackageFullName)': $_"
+				}
+			}
+
+			foreach ($provPkg in $provisionedPackages) {
+				try {
+					Remove-AppxProvisionedPackage -Online -PackageName $provPkg.PackageName -ErrorAction Stop | Out-Null
+					Write-Host "Removed provisioned AppX package: $($provPkg.DisplayName)" -ForegroundColor Green
+					$appxRemovedCount++
+				} catch {
+					Write-Warning "Failed to remove provisioned AppX package '$($provPkg.PackageName)': $_"
+				}
 			}
 		}
 
-		foreach ($provPkg in $provisionedPackages) {
-			try {
-				Remove-AppxProvisionedPackage -Online -PackageName $provPkg.PackageName -ErrorAction Stop | Out-Null
-				Write-Host "Removed provisioned AppX package: $($provPkg.DisplayName)" -ForegroundColor Green
-				$appxRemovedCount++
-			} catch {
-				Write-Warning "Failed to remove provisioned AppX package '$($provPkg.PackageName)': $_"
+		Write-Host "Removed $appxRemovedCount AppX package(s)." -ForegroundColor Green
+
+		# Remove SupportAssist-related directories.
+		$dirsToRemove = @(
+			"$env:ProgramFiles\Dell\SupportAssist",
+			"${env:ProgramFiles(x86)}\Dell\SupportAssist",
+			"$env:ProgramData\Dell\SupportAssist",
+			"$env:ProgramData\Dell\SARemediation",
+			"$env:AppData\Dell\SupportAssist",
+			"$env:LocalAppData\Dell\SupportAssist"
+		)
+
+		$dirRemovedCount = 0
+		foreach ($dir in $dirsToRemove) {
+			if (Test-Path $dir) {
+				try {
+					Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
+					Write-Host "Removed directory: $dir" -ForegroundColor Green
+					$dirRemovedCount++
+				} catch {
+					Write-Warning "Failed to remove directory '$dir': $_"
+				}
 			}
 		}
-	}
 
-	Write-Host "Removed $appxRemovedCount AppX package(s)." -ForegroundColor Green
-	if ($appxNotFoundCount -gt 0) {
-	#	Write-Host "$appxNotFoundCount AppX package name(s) not found on this system." -ForegroundColor Yellow
-	}
-
-	# Remove SupportAssist-related directories.
-	$dirsToRemove = @(
-		"$env:ProgramFiles\Dell\SupportAssist",
-		"${env:ProgramFiles(x86)}\Dell\SupportAssist",
-		"$env:ProgramData\Dell\SupportAssist",
-		"$env:ProgramData\Dell\SARemediation",
-		"$env:AppData\Dell\SupportAssist",
-		"$env:LocalAppData\Dell\SupportAssist"
-	)
-
-	$dirRemovedCount = 0
-	foreach ($dir in $dirsToRemove) {
-		if (Test-Path $dir) {
-			try {
-				Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
-				Write-Host "Removed directory: $dir" -ForegroundColor Green
-				$dirRemovedCount++
-			} catch {
-				Write-Warning "Failed to remove directory '$dir': $_"
-			}
+		if ($dirRemovedCount -gt 0) {
+			Write-Host "Removed $dirRemovedCount SupportAssist directory(ies)." -ForegroundColor Green
 		}
 	}
-
-	if ($dirRemovedCount -gt 0) {
-		Write-Host "Removed $dirRemovedCount SupportAssist directory(ies)." -ForegroundColor Green
-	}
-} else {
-	Write-Host "Skipped uninstall of Dell SupportAssist components." -ForegroundColor Yellow
 }
 
+# Optional: uninstall Cirrus Logic audio drivers.
+if ($cirrusPackagesFound.Count -gt 0) {
+	if ($AutoConfirm -or (Read-Host "Found Cirrus Logic packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
+		$cirrusUninstalled = $false
+		
+		Write-Host ""
+		Write-Host "Uninstalling Cirrus Logic audio drivers..." -ForegroundColor Cyan
+		Write-Host ""
+
+		# Uninstall Cirrus Logic software packages
+		Write-Host "[1/3] Uninstalling Cirrus Logic software packages..." -ForegroundColor Cyan
+		Write-Host "Found Cirrus Logic packages:" -ForegroundColor Green
+		foreach ($pkg in $cirrusPackagesFound) {
+			Write-Host "  - $($pkg.Name)" -ForegroundColor Yellow
+			if ($pkg.UninstallString) {
+				Write-Host "    Attempting to uninstall..." -ForegroundColor Yellow
+				try {
+					& cmd /c $pkg.UninstallString /S 2>$null
+					Write-Host "    Uninstalled successfully." -ForegroundColor Green
+					$cirrusUninstalled = $true
+				} catch {
+					Write-Warning "    Failed to uninstall package: $_"
+				}
+			}
+		}
+
+		# Clean up Cirrus Logic registry entries
+		Write-Host ""
+		Write-Host "[2/3] Cleaning up Cirrus Logic registry entries..." -ForegroundColor Cyan
+		$regSearchPaths = @(
+			"HKLM:\Software\Cirrus",
+			"HKCU:\Software\Cirrus"
+		)
+
+		foreach ($regPath in $regSearchPaths) {
+			if (Test-Path $regPath) {
+				Write-Host "Removing registry key: $regPath" -ForegroundColor Yellow
+				try {
+					Remove-Item $regPath -Recurse -Force -ErrorAction Stop
+					Write-Host "Registry key removed." -ForegroundColor Green
+					$cirrusUninstalled = $true
+				} catch {
+					Write-Warning "Failed to remove registry key '$regPath': $_"
+				}
+			}
+		}
+
+		# Remove Cirrus-related program directories
+		Write-Host ""
+		Write-Host "[3/3] Removing Cirrus Logic application directories..." -ForegroundColor Cyan
+		$cirrusDirs = @(
+			"$env:ProgramFiles\Cirrus",
+			"${env:ProgramFiles(x86)}\Cirrus",
+			"$env:ProgramData\Cirrus",
+			"$env:AppData\Cirrus",
+			"$env:LocalAppData\Cirrus"
+		)
+
+		$cirrusDirsRemoved = $false
+		foreach ($dir in $cirrusDirs) {
+			if (Test-Path $dir) {
+				try {
+					Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
+					Write-Host "Removed directory: $dir" -ForegroundColor Green
+					$cirrusUninstalled = $true
+					$cirrusDirsRemoved = $true
+				} catch {
+					Write-Warning "Failed to remove directory '$dir': $_"
+				}
+			}
+		}
+
+		if (-not $cirrusDirsRemoved) {
+			Write-Host "No Cirrus Logic directories found to remove." -ForegroundColor Yellow
+		}
+
+		Write-Host ""
+		if ($cirrusUninstalled) {
+			Write-Host "Cirrus Logic audio drivers have been uninstalled." -ForegroundColor Green
+		} else {
+			Write-Host "No Cirrus Logic drivers or packages were found to uninstall." -ForegroundColor Yellow
+		}
+	}
+}
+
+Write-Host ""
 Write-Host "You may need to restart your computer for changes to take effect." -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "A restart may be required for all targeted services to stop completely." -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "Press any key to exit..."
