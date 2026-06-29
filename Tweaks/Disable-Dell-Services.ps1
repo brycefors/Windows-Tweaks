@@ -223,7 +223,7 @@ foreach ($regPath in $uninstallRegistryPaths) {
 		$items = Get-ChildItem $regPath -ErrorAction SilentlyContinue
 		foreach ($item in $items) {
 			$displayName = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).DisplayName
-			if ($displayName -match "Cirrus" -or $displayName -match "CirrusLogic") {
+			if (($displayName -match "Cirrus" -or $displayName -match "CirrusLogic") -and $displayName -notmatch "(?i)setup") {
 				$cirrusPackagesFound += @{
 					Path = $item.PSPath
 					Name = $displayName
@@ -396,7 +396,7 @@ if ($supportAssistPackagesFound.Count -gt 0) {
 	}
 }
 
-# Optional: uninstall Cirrus Logic audio drivers.
+# Optional: uninstall Cirrus Logic audio drivers. Adds unncessary latency.
 if ($cirrusPackagesFound.Count -gt 0) {
 	if ($AutoConfirm -or (Read-Host "Found Cirrus Logic packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
 		$cirrusUninstalled = $false
@@ -413,7 +413,15 @@ if ($cirrusPackagesFound.Count -gt 0) {
 			if ($pkg.UninstallString) {
 				Write-Host "    Attempting to uninstall..." -ForegroundColor Yellow
 				try {
-					& cmd /c $pkg.UninstallString /S 2>$null
+					$cirrusCmd = $pkg.UninstallString
+					if ($cirrusCmd -match '(?i)msiexec(\.exe)?') {
+						$cirrusCmd = $cirrusCmd -replace '(?i)\s/I\s', ' /X '
+						if ($cirrusCmd -notmatch '(?i)\s/q') { $cirrusCmd += ' /qn' }
+						if ($cirrusCmd -notmatch '(?i)norestart') { $cirrusCmd += ' /norestart' }
+						& cmd /c $cirrusCmd 2>$null
+					} else {
+						& cmd /c $cirrusCmd /S /norestart 2>$null
+					}
 					Write-Host "    Uninstalled successfully." -ForegroundColor Green
 					$cirrusUninstalled = $true
 				} catch {
