@@ -39,7 +39,7 @@ Write-Host "2. Sets their startup type to Disabled."
 Write-Host "3. Disables Dell SupportAssistAgent AutoUpdate scheduled task."
 Write-Host "4. Optionally removes Dell pinned taskbar icons for all users."
 Write-Host "5. Optionally uninstalls Dell SupportAssist components (registry-based and AppX)."
-# Write-Host "6. Optionally uninstalls Cirrus Logic audio drivers and software."
+# Write-Host "6. Optionally uninstalls Cirrus Logic audio drivers and software." # Removed due to audio driver dependency issues on some Dell models.
 Write-Host ""
 Write-Host "Targeted services can include:"
 Write-Host "  - Dell SupportAssist"
@@ -396,7 +396,7 @@ if ($supportAssistPackagesFound.Count -gt 0) {
 	}
 }
 
-# Optional: uninstall Cirrus Logic audio drivers. Adds unncessary latency.
+# Optional: uninstall Cirrus Logic audio drivers.
 #if ($cirrusPackagesFound.Count -gt 0) {
 #	if ($AutoConfirm -or (Read-Host "Found Cirrus Logic packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
 #		$cirrusUninstalled = $false
