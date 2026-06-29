@@ -39,7 +39,7 @@ Write-Host "2. Sets their startup type to Disabled."
 Write-Host "3. Disables Dell SupportAssistAgent AutoUpdate scheduled task."
 Write-Host "4. Optionally removes Dell pinned taskbar icons for all users."
 Write-Host "5. Optionally uninstalls Dell SupportAssist components (registry-based and AppX)."
-Write-Host "6. Optionally uninstalls Cirrus Logic audio drivers and software."
+# Write-Host "6. Optionally uninstalls Cirrus Logic audio drivers and software."
 Write-Host ""
 Write-Host "Targeted services can include:"
 Write-Host "  - Dell SupportAssist"
@@ -217,24 +217,24 @@ foreach ($path in $uninstallRegistryPaths) {
 $supportAssistPackagesFound = $supportAssistPackagesFound | Sort-Object DisplayName -Unique
 
 # Scan for Cirrus Logic packages
-$cirrusPackagesFound = @()
-foreach ($regPath in $uninstallRegistryPaths) {
-	if (Test-Path $regPath) {
-		$items = Get-ChildItem $regPath -ErrorAction SilentlyContinue
-		foreach ($item in $items) {
-			$displayName = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).DisplayName
-			if (($displayName -match "Cirrus" -or $displayName -match "CirrusLogic") -and $displayName -notmatch "(?i)setup") {
-				$cirrusPackagesFound += @{
-					Path = $item.PSPath
-					Name = $displayName
-					UninstallString = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).UninstallString
-				}
-			}
-		}
-	}
-}
+#$cirrusPackagesFound = @()
+#foreach ($regPath in $uninstallRegistryPaths) {
+#	if (Test-Path $regPath) {
+#		$items = Get-ChildItem $regPath -ErrorAction SilentlyContinue
+#		foreach ($item in $items) {
+#			$displayName = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).DisplayName
+#			if (($displayName -match "Cirrus" -or $displayName -match "CirrusLogic") -and $displayName -notmatch "(?i)setup") {
+#				$cirrusPackagesFound += @{
+#					Path = $item.PSPath
+#					Name = $displayName
+#					UninstallString = (Get-ItemProperty $item.PSPath -ErrorAction SilentlyContinue).UninstallString
+#				}
+#			}
+#		}
+#	}
+#}
 
-$anyOptionalFound = $dellTaskbarIconsFound -or ($supportAssistPackagesFound.Count -gt 0) -or ($cirrusPackagesFound.Count -gt 0)
+$anyOptionalFound = $dellTaskbarIconsFound -or ($supportAssistPackagesFound.Count -gt 0)
 
 Write-Host "Scan complete." -ForegroundColor Green
 Write-Host ""
@@ -397,97 +397,97 @@ if ($supportAssistPackagesFound.Count -gt 0) {
 }
 
 # Optional: uninstall Cirrus Logic audio drivers. Adds unncessary latency.
-if ($cirrusPackagesFound.Count -gt 0) {
-	if ($AutoConfirm -or (Read-Host "Found Cirrus Logic packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
-		$cirrusUninstalled = $false
-		
-		Write-Host ""
-		Write-Host "Uninstalling Cirrus Logic audio drivers..." -ForegroundColor Cyan
-		Write-Host ""
-
-		# Uninstall Cirrus Logic software packages
-		Write-Host "[1/3] Uninstalling Cirrus Logic software packages..." -ForegroundColor Cyan
-		Write-Host "Found Cirrus Logic packages:" -ForegroundColor Green
-		foreach ($pkg in $cirrusPackagesFound) {
-			Write-Host "  - $($pkg.Name)" -ForegroundColor Yellow
-			if ($pkg.UninstallString) {
-				Write-Host "    Attempting to uninstall..." -ForegroundColor Yellow
-				try {
-					$cirrusCmd = $pkg.UninstallString
-					if ($cirrusCmd -match '(?i)msiexec(\.exe)?') {
-						$cirrusCmd = $cirrusCmd -replace '(?i)\s/I\s', ' /X '
-						if ($cirrusCmd -notmatch '(?i)\s/q') { $cirrusCmd += ' /qn' }
-						if ($cirrusCmd -notmatch '(?i)norestart') { $cirrusCmd += ' /norestart' }
-						& cmd /c $cirrusCmd 2>$null
-					} else {
-						& cmd /c $cirrusCmd /S /norestart 2>$null
-					}
-					Write-Host "    Uninstalled successfully." -ForegroundColor Green
-					$cirrusUninstalled = $true
-				} catch {
-					Write-Warning "    Failed to uninstall package: $_"
-				}
-			}
-		}
-
-		# Clean up Cirrus Logic registry entries
-		Write-Host ""
-		Write-Host "[2/3] Cleaning up Cirrus Logic registry entries..." -ForegroundColor Cyan
-		$regSearchPaths = @(
-			"HKLM:\Software\Cirrus",
-			"HKCU:\Software\Cirrus"
-		)
-
-		foreach ($regPath in $regSearchPaths) {
-			if (Test-Path $regPath) {
-				Write-Host "Removing registry key: $regPath" -ForegroundColor Yellow
-				try {
-					Remove-Item $regPath -Recurse -Force -ErrorAction Stop
-					Write-Host "Registry key removed." -ForegroundColor Green
-					$cirrusUninstalled = $true
-				} catch {
-					Write-Warning "Failed to remove registry key '$regPath': $_"
-				}
-			}
-		}
-
-		# Remove Cirrus-related program directories
-		Write-Host ""
-		Write-Host "[3/3] Removing Cirrus Logic application directories..." -ForegroundColor Cyan
-		$cirrusDirs = @(
-			"$env:ProgramFiles\Cirrus",
-			"${env:ProgramFiles(x86)}\Cirrus",
-			"$env:ProgramData\Cirrus",
-			"$env:AppData\Cirrus",
-			"$env:LocalAppData\Cirrus"
-		)
-
-		$cirrusDirsRemoved = $false
-		foreach ($dir in $cirrusDirs) {
-			if (Test-Path $dir) {
-				try {
-					Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
-					Write-Host "Removed directory: $dir" -ForegroundColor Green
-					$cirrusUninstalled = $true
-					$cirrusDirsRemoved = $true
-				} catch {
-					Write-Warning "Failed to remove directory '$dir': $_"
-				}
-			}
-		}
-
-		if (-not $cirrusDirsRemoved) {
-			Write-Host "No Cirrus Logic directories found to remove." -ForegroundColor Yellow
-		}
-
-		Write-Host ""
-		if ($cirrusUninstalled) {
-			Write-Host "Cirrus Logic audio drivers have been uninstalled." -ForegroundColor Green
-		} else {
-			Write-Host "No Cirrus Logic drivers or packages were found to uninstall." -ForegroundColor Yellow
-		}
-	}
-}
+#if ($cirrusPackagesFound.Count -gt 0) {
+#	if ($AutoConfirm -or (Read-Host "Found Cirrus Logic packages. Uninstall them now? (Y/N)") -match '^[Yy]') {
+#		$cirrusUninstalled = $false
+#		
+#		Write-Host ""
+#		Write-Host "Uninstalling Cirrus Logic audio drivers..." -ForegroundColor Cyan
+#		Write-Host ""
+#
+#		# Uninstall Cirrus Logic software packages
+#		Write-Host "[1/3] Uninstalling Cirrus Logic software packages..." -ForegroundColor Cyan
+#		Write-Host "Found Cirrus Logic packages:" -ForegroundColor Green
+#		foreach ($pkg in $cirrusPackagesFound) {
+#			Write-Host "  - $($pkg.Name)" -ForegroundColor Yellow
+#			if ($pkg.UninstallString) {
+#				Write-Host "    Attempting to uninstall..." -ForegroundColor Yellow
+#				try {
+#					$cirrusCmd = $pkg.UninstallString
+#					if ($cirrusCmd -match '(?i)msiexec(\.exe)?') {
+#						$cirrusCmd = $cirrusCmd -replace '(?i)\s/I\s', ' /X '
+#						if ($cirrusCmd -notmatch '(?i)\s/q') { $cirrusCmd += ' /qn' }
+#						if ($cirrusCmd -notmatch '(?i)norestart') { $cirrusCmd += ' /norestart' }
+#						& cmd /c $cirrusCmd 2>$null
+#					} else {
+#						& cmd /c $cirrusCmd /S /norestart 2>$null
+#					}
+#					Write-Host "    Uninstalled successfully." -ForegroundColor Green
+#					$cirrusUninstalled = $true
+#				} catch {
+#					Write-Warning "    Failed to uninstall package: $_"
+#				}
+#			}
+#		}
+#
+#		# Clean up Cirrus Logic registry entries
+#		Write-Host ""
+#		Write-Host "[2/3] Cleaning up Cirrus Logic registry entries..." -ForegroundColor Cyan
+#		$regSearchPaths = @(
+#			"HKLM:\Software\Cirrus",
+#			"HKCU:\Software\Cirrus"
+#		)
+#
+#		foreach ($regPath in $regSearchPaths) {
+#			if (Test-Path $regPath) {
+#				Write-Host "Removing registry key: $regPath" -ForegroundColor Yellow
+#				try {
+#					Remove-Item $regPath -Recurse -Force -ErrorAction Stop
+#					Write-Host "Registry key removed." -ForegroundColor Green
+#					$cirrusUninstalled = $true
+#				} catch {
+#					Write-Warning "Failed to remove registry key '$regPath': $_"
+#				}
+#			}
+#		}
+#
+#		# Remove Cirrus-related program directories
+#		Write-Host ""
+#		Write-Host "[3/3] Removing Cirrus Logic application directories..." -ForegroundColor Cyan
+#		$cirrusDirs = @(
+#			"$env:ProgramFiles\Cirrus",
+#			"${env:ProgramFiles(x86)}\Cirrus",
+#			"$env:ProgramData\Cirrus",
+#			"$env:AppData\Cirrus",
+#			"$env:LocalAppData\Cirrus"
+#		)
+#
+#		$cirrusDirsRemoved = $false
+#		foreach ($dir in $cirrusDirs) {
+#			if (Test-Path $dir) {
+#				try {
+#					Remove-Item -Path $dir -Recurse -Force -ErrorAction Stop
+#					Write-Host "Removed directory: $dir" -ForegroundColor Green
+#					$cirrusUninstalled = $true
+#					$cirrusDirsRemoved = $true
+#				} catch {
+#					Write-Warning "Failed to remove directory '$dir': $_"
+#				}
+#			}
+#		}
+#
+#		if (-not $cirrusDirsRemoved) {
+#			Write-Host "No Cirrus Logic directories found to remove." -ForegroundColor Yellow
+#		}
+#
+#		Write-Host ""
+#		if ($cirrusUninstalled) {
+#			Write-Host "Cirrus Logic audio drivers have been uninstalled." -ForegroundColor Green
+#		} else {
+#			Write-Host "No Cirrus Logic drivers or packages were found to uninstall." -ForegroundColor Yellow
+#		}
+#	}
+#}
 
 Write-Host ""
 Write-Host "You may need to restart your computer for changes to take effect." -ForegroundColor White -BackgroundColor DarkGreen
