@@ -234,13 +234,19 @@ foreach ($regPath in $uninstallRegistryPaths) {
 	}
 }
 
+$anyOptionalFound = $dellTaskbarIconsFound -or ($supportAssistPackagesFound.Count -gt 0) -or ($cirrusPackagesFound.Count -gt 0)
+
 Write-Host "Scan complete." -ForegroundColor Green
 Write-Host ""
 
-if (-not $AutoConfirm) {
-	$autoConfirmResponse = Read-Host "Auto-confirm all optional cleanup actions? (Y/N)"
-	if ($autoConfirmResponse -match '^[Yy]') {
-		$AutoConfirm = $true
+if (-not $anyOptionalFound) {
+	Write-Host "No optional cleanup components found." -ForegroundColor Yellow
+} else {
+	if (-not $AutoConfirm) {
+		$autoConfirmResponse = Read-Host "Auto-confirm all optional cleanup actions? (Y/N)"
+		if ($autoConfirmResponse -match '^[Yy]') {
+			$AutoConfirm = $true
+		}
 	}
 }
 Write-Host ""
